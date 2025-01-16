@@ -1,7 +1,7 @@
 <!doctype html><html lang="en">
 
 <head>
-<title>shapetest</title>
+<title>practice</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 
@@ -38,10 +38,10 @@ svg {
     overflow: visible;
     isolation: isolate;
     pointer-events: none;
-    filter: drop-shadow(0px 0px 10px orange);
+    /*filter: drop-shadow(0px 0px 10px orange);*/
 }
 
-path {
+#pad > path {
     fill: #eee;
     stroke: #eee;
     stroke-width: 1;
@@ -49,15 +49,26 @@ path {
     transition: opacity linear 400ms;
 }
 
+#advice {
+    margin: auto;
+    padding: 10px;
+    width: 400px;
+    height: 100px;
+    overflow: auto;
+    font-size: 10px;
+    color: #eee;
+    border: 2px solid green;
+}
+
 #notes {
     margin: auto;
     padding: 20px;
     width: 400px;
-    height: 200px;
+    height: 100px;
     background-color: #333;
     color: rgb(255,255,255,1);
     font-size: 50px;
-    overflow: auto;
+    overflow: hidden;
     user-select: none;
     touch-action: none;
     transition: all 100ms linear;
@@ -86,28 +97,67 @@ path {
     stroke-width: 2;
 }
 
-#dot {
+#werds {
+    margin: auto;
+    width: 400px;
+}
+
+#werds > div {
+    padding: 5px;
+    font-size: 10px;
+    color: hsl(40, 100%, 10%);
+    background-color: hsl(40, 100%, 50%);
+    transition: all linear 200ms;
+}
+
+#werds > div.complete {
+    padding: 0;
+    height: 0;
+    width: 0;
+}
+
+#dots > circle {
+    fill: #eee;
     opacity: 0;
-    transition: opacity 400ms linear;
+    transition: opacity 800ms linear;
 }
-#dot.show {
+
+#dots > circle.show {
     opacity: 1;
-    transition: opacity 0ms linear;
 }
+
+
 </style>
 
 </head>
 
 <body>
-<div id="holder"><div id="notes"></div></div>
-<svg viewbox="0 0 50 50"><g id="pad"/>
-<circle id="dot" fill="#eee" cx="0" cy="0" r="8"/>
+<div id="holder">
+    <div id="advice"></div>
+    <div id="notes"></div>
+    <div id="werds"></div>
+</div>
+<svg viewbox="0 0 50 50">
+    <g id="pad"/>
+    <g id="dots"/>
+    <path id="line" fill="none" stroke="white" stroke-width="0.2" />
+    <path id="pgon" fill="none" stroke="green" stroke-width="2" />
+    <g id="rat"/>
+    <g id="xpts"/>
 </svg>
 </body>
 
 <script>
 
-const log = (...v) => (console.log(...v), true);
+// DEBUGG {
+const dolog = true;
+const log = (...v) => {
+    if (dolog) {
+         console.log(...v)
+        return true
+    }
+};
+//}
 
 (() => {
     
@@ -116,9 +166,13 @@ const log = (...v) => (console.log(...v), true);
 const prefs = {
     minSize : 10,
     maxSize : 150,
+    maxLines : 10,
     penWidth : 5,
     penTheta : -0.3,   // radians
     pause :  300       // milliseconds
+    
+    ,anal: true
+    
 };
     
 //}
@@ -136,6 +190,7 @@ const sqrt = Math.sqrt;
 const sign = Math.sign;
 const atan = Math.atan;
 const rand = Math.random;
+const hypot = Math.hypot;
 const atan2 = Math.atan2;
 //}
 
@@ -150,6 +205,7 @@ const kill = e => { e.stopPropagation(); e.preventDefault() };
 
 const hold = byID('holder');
 const svg = byID('pad');
+const dots = byID('dots');
 
 //}
 
@@ -175,6 +231,83 @@ function Point (x, y) {
     this.LtoR = `${x-xtra} ${y-ytra} L ${x+xtra} ${y+ytra}`;
 
 }
+
+//}
+
+// line functions {
+
+const linz = (d, t=true) => {
+    
+     return d.map(D => new LineObj(D, t));
+        
+};
+
+const hitz = (a, b) => {
+    
+    //if (!(a && a.coor)) return [];
+    //if (!(b && b.coor)) return [];
+    
+    return a.coor.slice(0, -1).flatMap((ci, i) =>
+        b.coor.slice(0, -1).map((cj, j) =>
+            crss([ci, a.coor[i + 1], cj, b.coor[j + 1]])
+        ).filter(Boolean)
+    );
+    
+}
+
+const crss = h => {
+
+    if (h.length < 4) return false;
+
+    //* foxxy method *//
+    let [a, b, c, d, p, q, r, s] = [...h.flat()];
+
+    let det = (c - a) * (s - q) - (r - p) * (d - b), gam, lam;
+    
+    if (det === 0) return false;
+    
+    lam = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
+    gam = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
+    
+    return ((0 < lam && lam < 1) && (0 < gam && gam < 1)) ?
+    [a + lam * (c - a), b + lam * (d - b)] : false;
+
+};
+
+const dist = (a, b) => hypot(
+    (a?.[0] || a?.x) - (b?.[0] || b?.x),
+    (a?.[1] || a?.y) - (b?.[1] || b?.y)
+);
+        
+const leng = d =>
+(d[0].x ? d.map(v => [v.x, v.y]) : d).slice(1).reduce(
+    (sum, p, i) => sum + dist(d[i], p), 0
+);
+
+const XP = (p1, p2, p3) => (
+     (p2[0] - p1[0]) * (p3[1] - p2[1]) -
+     (p2[1] - p1[1]) * (p3[0] - p2[0])
+);
+
+const pent = pts => {
+    
+    const firstCross = XP(pts[0], pts[1], pts[2]);
+    if (firstCross === 0) return false;
+
+    const sign = Math.sign(firstCross);
+
+    for (let i = 1; i < 5; i++) {
+        const cross = XP(
+            pts[i], pts[(i + 1) % 5], pts[(i + 2) % 5]
+        );
+
+        if (cross === 0 || Math.sign(cross) !== sign) {
+            return false;
+        }
+    }
+
+    return true;
+};
 
 //}
 
@@ -215,12 +348,33 @@ function LineObj (d, filt=true) {
         this.coor.push([XXX.at(-1), YYY.at(-1)]);
     }
 
+    const [xMin, xMax, yMin, yMax] = this.coor.map(
+        (v, i) => [...v, i]
+    ).reduce(
+        ([xMin, xMax, yMin, yMax], pt) => [
+                pt[0] < xMin[0] ? pt : xMin,
+                pt[0] > xMax[0] ? pt : xMax,
+                pt[1] < yMin[1] ? pt : yMin,
+                pt[1] > yMax[1] ? pt : yMax
+        ],
+        [
+            this.coor[0], this.coor[0],
+            this.coor[0], this.coor[0]
+        ]
+    );
+
+    this.first = this.coor[0];
+    this.last = this.coor.at(-1);
     this.XXX = this.coor.map(c => c[0]);
     this.YYY = this.coor.map(c => c[1]);
-    this.xMin = min(...this.XXX);
-    this.yMin = min(...this.YYY);
-    this.xMax = max(...this.XXX);
-    this.yMax = max(...this.YYY);
+    this.xMin = xMin[0];
+    this.yMin = yMin[1];
+    this.xMax = xMax[0];
+    this.yMax = yMax[1];
+    this.xMinPt = xMin;
+    this.yMinPt = yMin;
+    this.xMaxPt = xMax;
+    this.yMaxPt = yMax;
     this.wide = this.xMax - this.xMin;
     this.high = this.yMax - this.yMin;
 
@@ -249,18 +403,15 @@ LineObj.prototype.getTurns = function (filt=true) {
     T.forEach((t, i) => {
         
         this.turns[['xPts','yPts'][i]] = t.map(v =>
-            [this.XXX[v[1]], this.YYY[v[1]], v[1]]
+            [this.XXX[v[1]], this.YYY[v[1]], v[1], v[0]]
         );
         
         if (filt) {
             
             this.turns[['xPts', 'yPts'][i]] =
-            this.turns[['xPts', 'yPts'][i]].filter(t => {
-                return t[2] > 5 || (
-                    abs(this.XXX[0] - t[0]) > 5 ||
-                    abs(this.YYY[0] - t[1]) > 10
-                )
-            });
+            this.turns[['xPts', 'yPts'][i]].filter(
+                t => t[2] > 5 || dist(this.first, t) > 5
+            );
             
         }
         
@@ -420,6 +571,12 @@ LineObj.prototype.getCenter = function () {
     
 };
 
+LineObj.prototype.getLength = function () {
+
+    this.lineLength = leng(this.coor);
+    return this;
+};
+
 LineObj.prototype.makeSVG = function () {
     
     this.svg = 'M'+ this.coor[0].join(' ');
@@ -436,362 +593,547 @@ LineObj.prototype.makeSVG = function () {
 
 //}
 
-// line functions {
-
-const linz = (d, t=true) => {
-    
-     return d.map(D => new LineObj(D, t));
-        
-};
-
-const hitz = (a, b) => {
-    
-    return a.coor.slice(0, -1).flatMap((ci, i) =>
-        b.coor.slice(0, -1).map((cj, j) =>
-            crss([ci, a.coor[i + 1], cj, b.coor[j + 1]])
-        ).filter(Boolean)
-    );
-    
-}
-
-const crss = h => {
-
-    if (h.length < 4) return false;
-
-    //* foxxy method *//
-    let [a, b, c, d, p, q, r, s] = [...h.flat()];
-
-    let det = (c - a) * (s - q) - (r - p) * (d - b), gam, lam;
-    
-    if (det === 0) return false;
-    
-    lam = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
-    gam = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
-    
-    return ((0 < lam && lam < 1) && (0 < gam && gam < 1)) ?
-    [a + lam * (c - a), b + lam * (d - b)] : false;
-
-};
-
-//}
-
 // shape tests {
 
 const tests = {
     
-    // {
-
+    //{
+    
     // | up stroke
     ups: d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push((
+            d.length === 1
+        ) || 'only one line');
+        
+        L = linz(d, 0)[0].getTurns().getAtOrig();
+        
+        msg.push((
+            L.wide < 10
+        ) || 'too wide');
             
-            d.length === 1 &&
+        msg.push((
+            L.high > 20
+        ) || 'too short');
+        
+        msg.push((
+            L.high < 2 * prefs.maxSize
+        ) || 'too tall');
             
-            (L = linz(d, 0)[0].getTurns().getAtOrig()) &&
+        msg.push((
+            L.turns.x < 2 &&
+            L.turns.y < 2
+        ) || 'must be straight');
+        
+        msg.push((
+            L.org.ang < -1.3 &&
+            L.org.ang > -1.84
+        ) || 'must go upward');
             
-            L.wide < 10 &&
-            L.high > 20 && L.high < 2 * prefs.maxSize &&
-            L.turns.x < 2 && L.turns.y < 2 &&
-            L.org.ang < -1.3 && L.org.ang > -1.84
-            
-        );
+        return msg;
         
     },
          
     // | dn stroke
     dns: d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 1
+        || 'must be one line');
+        
+        L = linz(d, 0)[0].getTurns().getAtOrig();
+        
+        msg.push(
+            L.wide < 10
+        || 'too wide');
+        
+        msg.push(
+            L.high > 20
+        || 'too small');
+        
+        msg.push(
+            L.high < 2 * prefs.maxSize
+        || 'too big');
+        
+        msg.push((
+            L.turns.x < 2 &&
+            L.turns.y < 2
+        ) || 'must be straight');
+        
+        msg.push((
+            L.org.ang > 1.3 &&
+            L.org.ang < 1.84
+        ) || 'must go downward');
             
-            d.length === 1 &&
-            (L = linz(d, 0)[0].getTurns().getAtOrig()) &&
-            L.wide < 10 &&
-            L.high > 20 && L.high < 2 * prefs.maxSize &&
-            L.turns.x < 2 && L.turns.y < 2 &&
-            L.org.ang > 1.3 && L.org.ang < 1.84
-            
-        );
+        return msg;
         
     },
         
     // _ underline
     und: d => {
                 
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 1
+        || 'must be 1 line');
+        
+        L = linz(d)[0].getTurns();
+        
+        msg.push(
+            L.wide > 20
+        || 'not long enough');
+        
+        msg.push(
+            L.wide < 3 * prefs.maxSize
+        || 'too long');
+        
+        msg.push(
+            L.high < 0.1 * L.wide
+        || 'must be flat');
+        
+        msg.push((
+            L.turns.x < 2 &&
+            L.turns.y < 3
+        ) || `keep it straight ${L.turns.x} ${L.turns.y}`);
+        
+        'xy'.split('').forEach(v => {
+            L.turns[v +'Pts'].forEach((pp, i) => {
+                byID('rat').append(makeDot(
+                    pp,
+                    v === 'x' ? 5 : 3,
+                    v === 'x' ? 'green' : 'orange'
+                ));
+            });
+        });
+        
+        return msg;
             
-            d.length === 1 &&
-            (L = linz(d)[0].getTurns()) &&
-            L.wide > 20 && L.wide < 2 * prefs.maxSize &&
-            L.high < 0.1 * L.wide &&
-            L.turns.x === 0 && L.turns.y < 2
-            
-        );
         
     },
     
     // / slash
     sla: d => {
         
-        let L;
-        let msg;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 1
+        || 'must be one line');
             
-            d.length === 1 &&
+        L = linz(d)[0].getTurns().getSlopes();
             
-            (L = linz(d)[0].getTurns().getSlopes()) &&
+        msg.push(
+            L.wide > prefs.minSize
+        || 'not wide enough');
+        
+        msg.push(
+        L.wide < prefs.maxSize * 3
+        || 'too wide');
+        
+        msg.push(
+            L.high > prefs.minSize
+        || 'not tall enough');
+        
+        msg.push(
+            L.high < prefs.maxSize * 3
+        || 'too tall');
             
-            L.wide > prefs.minSize  &&
-            L.wide < prefs.maxSize * 3 &&
-            L.high > prefs.minSize &&
-            L.high < prefs.maxSize * 3 &&
-            
+        msg.push((
             L.turns.x === 0 &&
-            L.turns.y === 0 &&
+            L.turns.y === 0
+        ) || 'keep it straight');
             
+        msg.push(
             L.slopes.val.filter(
                 s => -3 < s && s < -0.3
             ).length / L.slopes.val.length > 0.8
+        || 'wrong angle');
+        
+        return msg;
              
-        );
 
     },
     
     // remove-werd loop
     lup: d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 1
+        || 'must be one line');
             
-            d.length === 1 &&
+        L = linz(d)[0].getTurns().getSelfXs();
             
-            (L = linz(d)[0].getTurns().getSelfXs()) &&
-            
-            L.turns.x === 2 &&
-            L.turns.y === 1 &&
-            L.crosses.length === 1 &&
-            
+        msg.push(
+            L.turns.x === 2
+        || 'needs exactly 2 x-turns');
+        
+        msg.push(
+            L.turns.y === 1
+        || 'needs exactly 1 y-turn');
+        
+        msg.push(
+            L.crosses.length === 1
+        || 'exactly one crossing');
+        
+        msg.push((
             L.wide > prefs.minSize &&
-            L.wide < prefs.maxSize &&
-            L.high > prefs.minSize &&
-            L.high < prefs.maxSize &&
+            L.high > prefs.minSize
+        ) || 'too small');
+            
+        msg.push((
+            L.wide < prefs.maxSize * 2 &&
+            L.high < prefs.maxSize * 2
+        ) || 'too big');
         
-            L.YYY[0] > L.YYY.at(-1) &&
+        msg.push(
+            L.YYY[0] > L.YYY.at(-1)
+        || 'must end higher than start');
         
-            L.crosses[0].x - L.XXX[0] > 0.5 * L.wide &&
-            L.YYY[0] - L.crosses[0].y > 0.5 * L.high &&
+        msg.push(
+            L.crosses.length === 1
+        || 'needs exactly one cross');
+       
+        msg.push(
+            L.crosses?.[0]?.x - L.XXX[0] > 0.5 * L.wide
+        || 'must cross right of center');
         
-            L.turns.yPts[0][1] < L.turns.xPts[0][1]
+        msg.push(
+            L.YYY[0] - L.crosses?.[0]?.y > 0.5 * L.high
+        || 'must cross above mid-point');
         
-        );
+        msg.push(
+            L.turns.yPts?.[0]?.[1] <
+            L.turns.xPts?.[0]?.[1]
+        || '' );
         
+        return msg;
     },
 
     // check box &#10003;
     chx: d => {
         
-        let L, Dn, Up;
+        let L, Dn, Up, msg = [];
         
-        return (
             
-            d.length === 1 &&
+        msg.push(
+            d.length === 1
+        || 'must be one line');
+        
             
-            (d[0].at(-1)[0] > d[0][0][0] || d[0].reverse()) &&
-            
-            (L = linz(d)[0].getTurns()) &&
-            
-            L.turns.x < 2 && L.turns.y === 1 &&
-                    
+        d[0].at(-1)[0] > d[0][0][0] || d[0].reverse()
+        
+        L = linz(d)[0].getTurns();
+        
+        msg.push(
+            L.turns?.x < 3
+        || 'try not to have x-turns');
+        
+        msg.push(
+            L.turns?.y === 1
+        || 'needs exactly 1 y-turn');
+    
+        msg.push((
             L.wide > prefs.minSize &&
-            L.wide < prefs.maxSize &&
-            L.high > prefs.minSize &&
-            L.high < prefs.maxSize &&
-            
-            (Dn = {
-                ...L.getAtOrig(0, L.turns.yPts[0][2] + 1).org
-            },
-            Up = {
-                ...L.getAtOrig(L.turns.yPts[0][2]).org
-            }, true ) &&
-
-            Up.len > 1.6 * Dn.len &&
-            
-            L.turns.yPts[0][1] - L.YYY[0] > 0.2 * L.high &&
-            
-            Dn.coor.every(p => -3 < p[0] && p[0] < 5) &&
+            L.high > prefs.minSize
+        ) || 'too small');
         
-            Up.coor.every(p => -3 < p[0] && p[0] < 10) &&
+        msg.push((
+            L.wide < prefs.maxSize * 3 &&
+            L.high < prefs.maxSize * 3
+        ) || 'too big');
             
-            Dn.ang - Up.ang > 1.5
-
-        );
+            
+        Dn = {
+        ...L.getAtOrig(0, L.turns?.yPts?.[0]?.[2] + 1).org
+        };
+       
+        Up = {
+        ...L.getAtOrig(L.turns?.yPts?.[0]?.[2]).org
+        };
+        
+        msg.push(
+            Up.len > 1.6 * Dn.len
+        || 'up-stroke atlest 160% of down');
+        
+        msg.push(
+            L.turns.yPts?.[0]?.[1] - L.YYY[0] > 0.2 * L.high
+        || 'dn-stroke more than 20% of height');
+        
+        msg.push(
+            Dn.coor.every(p => -3 < p[0] && p[0] < 8)
+        || 'dn-stroke must be straight');
+        
+        msg.push(
+            Up.coor.every(p => -3 < p[0] && p[0] < 20)
+        || 'up-stroke must be straight');
+        
+        msg.push(
+            Dn.ang > 0.6 && Dn.ang < 2.3
+        || 'dn stroke angle bad');
+        
+        msg.push(
+            Up.ang > -1.2 && Up.ang < -0.3
+        || 'up stoke ang bad');
+        
+        return msg;
 
     },
     
     // infinity symbol &#8734;
     inf: d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push((
+            d.length === 1
+        ) || 'must be one line');
+        
+        L = linz(d)[0].getSelfXs().getTurns();
+        
+        msg.push ((
+            L.wide > 2 * prefs.minSize
+        ) || 'too small');
+        
+        msg.push((
+            L.wide < 2 * prefs.maxSize
+        ) || 'too big');
+        
+        msg.push ((
+            L.crosses.length > 0
+        ) || 'needs 1 cross');
+        
+        msg.push((
+            L.crosses.length < 3
+        ) || 'too many crosses');
+        
+        L.crosses = L.crosses.filter(p => abs(
+            p.x - (L.xMin + L.wide / 2)
+        ) < 0.15 * L.wide);
             
-            d.length === 1 &&
-            
-            (L = linz(d)[0].getSelfXs().getTurns()) &&
-            
-            L.wide > 40 && L.wide < 2 * prefs.maxSize &&
-            
-            (L.crosses = L.crosses.filter(p =>
-                abs(p.x - L.xMin - L.wide / 2) < 0.1 * L.wide
-            )) &&
-    
-            0 < L.crosses.length && L.crosses.length < 3 &&
-            
+        msg.push((
+            L.crosses.length === 1
+        ) || 'cross not centered');
+        
+        msg.push((
             abs((
                 L.YYY[L.XXX.indexOf(L.xMax)] -
                 L.YYY[L.XXX.indexOf(L.xMin)]) / L.wide
-            ) < 0.2 &&
+            ) < 0.2
+        ) || 'not horizontal enough');
             
-            //abs(L.XXX[0] - L.XXX.at(-1)) < 10 &&
-            //abs(L.YYY[0] - L.YYY.at(-1)) < 10 &&
-            
-            0 < L.turns.x && L.turns.x < 3 &&
-            2 < L.turns.y && L.turns.y < 5
-            
-        );
+        msg.push((
+            L.turns.x === 2
+        ) || 'must be exactly two x-turns');
+        
+        msg.push((
+            L.turns.y === 4
+        ) || 'must be exactly four y-turns');
+    
+        msg.push((
+            L.turns.yPts.map(v => v[2]).filter(v =>
+                v > L.turns.xPts?.[0]?.[2] &&
+                v < L.turns.xPts?.[1]?.[2]
+            ).length === 2
+        ) || 'cannot be a pretzel');
+        
+        return msg;
     
     },
-
+    
     // triple underline &#8801;
     tri : d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 3
+        || 'exactly three lines');
+        
+        if (d.length !== 3) return msg;
+        
+        L = linz(d).sort((a, b) => a.yMax - b.yMax);
+        
+        msg.push(
+            L[2].yMax - L[0].yMin < prefs.maxSize * 3
+        || 'too tall');
             
-            d.length === 3 &&
+        L.forEach((LL, i) => {
             
-            (L = linz(d).sort((a, b) => a.yMax - b.yMax)) &&
+            LL.getTurns(),
             
-            L[2].yMax - L[0].yMin < prefs.maxSize &&
+            msg.push(
+                LL.high < LL.wide * 0.1
+            || `line ${i + 1} not flat`);
+      
+        
+            msg.push(
+                LL.turns?.x < 2
+            || `too many x-turns in line ${i + 1}`);
+        
+            msg.push(
+                LL.turns?.y < 3
+            || `too many y-turns in line ${i + 1}`);
+        
+            msg.push((
+                LL.wide > prefs.minSize * 3 &&
+                LL.wide < prefs.maxSize * 3
+            ) || `line ${i + 1} too wide`);
+        
+        
+        });
+        
+        L.slice(1).forEach((LL, i) => {
+        
+            msg.push(
+                abs(L[0].xMin - LL.xMin) < 0.6 * L[0].wide
+            || `line ${i + 2} not aligned`);
+        
+            msg.push(
+                abs(L[0].xMax - LL.xMax) < 0.6 * L[0].wide
+            || `line ${i + 2} not aligned`);
+        
+            msg.push(
+                LL.yMax - L[0].yMax >
+                i * prefs.penWidth * 5
+            || `line ${i + 2} too close vertically`);
+        
+        });
             
-            L.every((LL, i) => ( LL.getTurns(),
-                
-                    LL.turns.x === 0 &&
-                    LL.turns.y < 2 &&
-                    LL.wide > prefs.minSize &&
-                    LL.wide < prefs.maxSize &&
-                    LL.high < 0.5 * LL.wide
-                    
-            )) &&
-            
-            L.slice(1).every((LL, i) => (
-                
-                    abs(L[0].xMin - LL.xMin)
-                    < 0.6 * L[0].wide &&
-                    
-                    abs(L[0].xMax - LL.xMax)
-                    < 0.6 * L[0].wide &&
-                    
-                    LL.yMax - L[0].yMax
-                    > i * prefs.penWidth
-                    
-            )) &&
-            
-            !hitz(L[0], L[1])[0] &&
-            !hitz(L[0], L[2])[0] &&
-            !hitz(L[1], L[2])[0]
-            
-            
-        );
+        msg.push((
+            !hitz(L?.[0], L?.[1])?.[0] &&
+            !hitz(L?.[0], L?.[2])?.[0] &&
+            !hitz(L?.[1], L?.[2])?.[0]
+        ) || 'lines cannot touch');
+        
+        return msg;
         
     },
 
     // # mark
     has: d => {
         
-        let Vt, Hz;
+        let Vt, Hz, msg = [];
         
-        return (
+        msg.push(
+            d.length === 4
+        || 'must have 4 lines');
+        
+        if (d.length !== 4) return msg;
             
-            d.length === 4 &&
-            
-            ([Vt, Hz] = linz(d).reduce((acc, LL) => {
-            
-                LL.getTurns();
-                acc[(
-                    
-                   (LL.turns.y === 0 &&
+        [Vt, Hz] = linz(d).reduce((acc, LL, i) => {
+        
+            LL.getTurns();
+            acc[(
+        
+                (LL.turns.y < 2 &&
                     LL.turns.x < 2 &&
-                    LL.XXX.every(x => abs(LL.XXX[0]-x) < 20))
-                    ? 0 :
-            
-                   (LL.turns.x === 0 &&
+                    LL.XXX.every(x => abs(LL.XXX[0] - x) < 20)) ?
+                0 :
+        
+                (LL.turns.x < 2 &&
                     LL.turns.y < 2 &&
-                    LL.YYY.every(y => abs(LL.YYY[0]-y) < 20))
-                    ? 1 : 2
-                
-                )].push(LL);
+                    LL.YYY.every(y => abs(LL.YYY[0] - y) < 20)) ?
+                1 : 2
+        
+            )].push(LL);
+        
+            return acc;
+        
+        },[[],[],[]]);
+        
+        msg.push(
+            Hz.length === 2
+        || 'needs 2 horizontal lines');
+    
+        msg.push(
+            Vt.length === 2
+        || 'needs 2 vertical lines');
+        
+        if (!(Hz.length === 2 && Vt.length === 2)) {
+            return msg;
+        }
+        
+        Hz.wide = abs(
+            max(Hz[0].xMax, Hz[1].xMax) -
+            min(Hz[0].xMin, Hz[1].xMin)
+        );
+        
+        Vt.high = abs(
+            max(Vt[0].yMax, Vt[1].yMax) -
+            min(Vt[0].yMin, Vt[1].yMin)
+        );
             
-                return acc;
-                
-            },[[],[],[]])) &&
-            
-            Vt.length === 2 && Hz.length === 2 &&
-            
-            (Hz.wide = abs(
-                max(Hz[0].xMax, Hz[1].xMax) -
-                min(Hz[0].xMin, Hz[1].xMin)
-            ),Vt.high = abs(
-                max(Vt[0].yMax, Vt[1].yMax) -
-                min(Vt[0].yMin, Vt[1].yMin)
-            )) &&
-            
+        msg.push(
             Hz.wide > prefs.minSize &&
+            Vt.high > prefs.minSize
+        || 'too small');
+        
+        msg.push(
             Hz.wide < prefs.maxSize * 2 &&
-            Vt.high > prefs.minSize &&
-            Vt.high < prefs.maxSize * 2 &&
+            Vt.high < prefs.maxSize * 2
+        || 'too big');
             
+
+        msg.push((
             hitz(Hz[0], Vt[0]).length === 1 &&
             hitz(Hz[0], Vt[1]).length === 1 &&
             hitz(Hz[1], Vt[0]).length === 1 &&
-            hitz(Hz[1], Vt[1]).length === 1 &&
+            hitz(Hz[1], Vt[1]).length === 1
+        ) || 'all lines must cross');
             
-            abs(Hz[0].yMax - Hz[1].yMax) > prefs.penWidth &&
-            abs(Vt[0].xMax - Vt[1].xMax) > prefs.penWidth
-            
-        );
+        msg.push(
+            abs(Hz[0].yMax - Hz[1].yMax) > prefs.penWidth * 2
+        || 'horizontals too close');
+        msg.push(
+            abs(Vt[0].xMax - Vt[1].xMax) > prefs.penWidth * 2
+        || 'verticals too close');
+        
+        return msg;
         
     },
     
     // * five point &#9957;
-    str: d => {
+    xxx_str: d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 1
+        || 'must be only 1 line');
+        
+        if (d.length !== 1) return msg;
+        
+        L = linz(d)[0].getTurns().getSelfXs();
+        
+        msg.push(
+            dist(L.coor[0], L.coor.at(-1)) < 100
+        || 'end not near start');
+        
+        msg.push(
+            L.wide < prefs.maxSize * 2
+        || 'too wide');
+        
+        msg.push(
+            L.high < prefs.maxSize * 2
+        || 'too tall');
+        
+        if (
+            L.turns.x === 3 &&
+            L.turns.y === 3 &&
+            L.crosses.length > 4 &&
+            L.crosses.length < 7
+        ) return msg;
+        
+        msg.push(
             
-            d.length === 1 &&
-            
-            (L = linz(d)[0].getTurns().getSelfXs()) &&
-            
-            L.wide < 2 * prefs.maxSize &&
-            L.high < 2 * prefs.maxSize &&
-            
-            ((
-                L.turns.x === 3 &&
-                L.turns.y === 3 &&
-                L.crosses.length > 4 &&
-                L.crosses.length < 7
-            ) || (
+            (
                 
                 (
                     L.turns.first = [
@@ -825,232 +1167,395 @@ const tests = {
                 L.reCoor.length > 5 &&
                 L.reCoor.length < 8 &&
                 
-               (L = new LineObj(L.reCoor, 0).getSelfXs()) &&
-                
+               (L = new LineObj(L.reCoor, 0).getSelfXs())&&
+               
                 L.crosses.length > 4 &&
                 L.crosses.length < 7
 
-            ))
+            )
+        || 'is not star-shaped');
+        
+        return msg;
             
-        );
+        
+    },
+    
+    // * five point &#9957;
+    str: d => {
+        
+        let L, msg = [];
+        
+        msg.push(
+            d.length === 1
+        || 'must be only 1 line');
+        
+        if (d.length !== 1) return msg;
+        
+        L = linz(d)[0].getTurns().getSelfXs().getCenter();
+        
+        msg.push(
+            dist(L.coor[0], L.coor.at(-1)) < 100
+        || 'end not near start');
+        
+        msg.push(
+            L.wide < prefs.maxSize * 2
+        || 'too wide');
+        
+        msg.push(
+            L.high < prefs.maxSize * 2
+        || 'too tall');
+        
+        let cPen = [...L.crosses];
+        L.crosses.forEach(v => v.dist = (dist(L.center, v)));
+        cPen.sort((a,b)=>a.dist-b.dist);
+        cPen = cPen.splice(0, 5);
+        cPen.sort((a,b)=>a.id1-b.id1);
+        
+        msg.push(
+            cPen.length === 5
+        || 'needs five crossings');
+        
+        if (cPen.length !== 5) return msg;
+        
+        msg.push(
+            pent(cPen.map(v => [v.x, v.y]))
+        || 'needs inner pentagon');
+        
+        return msg;
+            
         
     },
 
     // u-shaped curve &#8746;
     you: d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 1
+        || 'must be one line');
+        
+        if (d.length !== 1) return msg;
             
-            d.length < 3 &&
-            
-            (d[0][0][0] < d[0].at(-1)[0] || d[0].reverse()) &&
-            
-            (L = linz(d)[0].getTurns()) &&
+        (d[0][0][0] < d[0].at(-1)[0] || d[0].reverse());
+        
+        L = linz(d)[0].getTurns();
            
-            L.turns.x === 0 &&
-            L.turns.y === 1 &&
+        msg.push(
+            L.turns.x < 2
+        || 'too many lf/rt moves');
         
-            L.wide > prefs.minSize &&
-            L.wide < prefs.maxSize &&
-            L.high > 0.1 * L.wide  &&
+        msg.push(
+            L.turns.y === 1
+        || 'too many up/dn moves');
+        
+        msg.push(
+            L.wide > prefs.minSize
+        || 'too small');
+        
+        msg.push(
+            L.wide < prefs.maxSize * 2
+        || 'too big');
+        
+        msg.push(
+            L.high > 0.1 * L.wide
+        || 'too shallow');
+        
+        msg.push(
+            L.high < 0.5 * L.wide
+        || 'too deep');
             
-           (L.YYY[0] === L.yMin || L.YYY.at(-1) === L.yMin) &&
+        msg.push(
+        (L.YYY[0] === L.yMin || L.YYY.at(-1) === L.yMin)
+        || 'start & end must be on top');
+        
+        msg.push(
+            abs(L.YYY[0] - L.YYY.at(-1)) < 0.2 * L.wide
+        || 'start & end must align');
             
-            abs(L.YYY[0] - L.YYY.at(-1)) < 0.2 * L.wide &&
-            
-            linz([
-                L.coor.slice(0, L.turns.yPts[0][2] + 1),
-                L.coor.slice(   L.turns.yPts[0][2])
-            ]).every(LL => LL.getAtOrig().org.xMin < -1)
-            
-        );
+        return msg;
 
     },
     
     // werds reversed &#8767;
     rev: d => {
         
-        let L;
+        let L, msg = [];
         
-        return (
+        msg.push(
+            d.length === 1
+        || 'must be one line');
+        
+        if (d.length !== 1) return msg;
+        
             
-            d.length === 1 &&
+        (d[0].at(-1)[0] > d[0][0][0] || d[0].reverse());
             
-            (d[0].at(-1)[0] > d[0][0][0] || d[0].reverse()) &&
-            
-            (L = linz(d)[0].getTurns()) &&
-            
+        L = linz(d)[0].getTurns();
+        
+        msg.push((
             L.wide > prefs.minSize &&
-            L.wide < 2 * prefs.maxSize &&
-            L.high > prefs.minSize &&
-            L.high < 2 * prefs.maxSize &&
-            
-            L.turns.x === 0 && L.turns.y === 2 &&
-            
-            L.turns.yPts.some(p => p[1] === L.yMin) &&
-            L.turns.yPts.some(p => p[1] === L.yMax) &&
-            
-            L.turns.yPts[1][0] - L.turns.yPts[0][0]
-            > 0.4 * L.wide &&
-            
-            abs(L.YYY[0]     - L.turns.yPts[0][1])
-            > 0.3 * L.high &&
-            
-            abs(L.YYY.at(-1) - L.turns.yPts[1][1])
-            > 0.3 * L.high
-            
-        );
+            L.high > prefs.minSize
+        ) || 'too small');
         
+        msg.push((
+            L.wide < prefs.maxSize * 2 &&
+            L.high < prefs.maxSize * 2
+        ) || 'too big');
+            
+        msg.push(
+            L.turns.x === 0
+        || 'too many lf/rt moves');
+        
+        msg.push(
+            L.turns.y === 2
+        || 'must be 2 y-turns');
+            
+        msg.push(
+            L.turns.yPts.some(p => p[1] === L.yMin)
+        || 'needs arc at top');
+        
+        msg.push(
+            L.turns.yPts.some(p => p[1] === L.yMax)
+        || 'needs arc at bottom');
+            
+        msg.push(
+            L.turns.yPts?.[1]?.[0] - L.turns.yPts?.[0]?.[0]
+            > 0.4 * L.wide
+        || 'arcs too asymmetrical');
+            
+        msg.push(
+            abs(L.YYY[0] - L.turns.yPts?.[0]?.[1])
+            > 0.3 * L.high
+        || 'arc not above start/end line');
+        
+        msg.push(
+            abs(L.YYY.at(-1) - L.turns.yPts?.[1]?.[1])
+            > 0.3 * L.high
+        || '2nd arc too shallow');
+        
+        return msg;
     },
     
     // missing period &#9737;
     per: d => {
         
-        let Dt, Cr;
+        let Dt, Cr, msg = [];
         
-        return (
-            
-            d.length === 2 &&
-            
-            ([Dt, Cr] = d.reduce((acc, c) => (acc[(
+        msg.push(
+            d.length === 2
+        || 'must be two lines');
+        
+        if (d.length !== 2) return msg;
+        
+        
+        [Dt, Cr] = d.reduce((acc, c) => (acc[(
                 
-                c.length < 15 &&
-                c.slice(1).every(p =>
-                    abs(p[0] - c[0][0]) < 5 &&
-                    abs(p[1] - c[0][1]) < 5
-                )
+            c.length < 15 &&
+            c.slice(1).every(p =>
+                abs(p[0] - c[0][0]) < 5 &&
+                abs(p[1] - c[0][1]) < 5
+            )
                     
-            )?0:1].push(new LineObj(c)),acc),[[],[]])) &&
+        ) ? 0 : 1].push(new LineObj(c)),acc),[[],[]]);
+        
+        msg.push((
+            Dt.length === 1 && Cr.length === 1
+        ) || 'needs 1 dot and 1 circle');
+        
+        if (Dt.length !== 1 || Cr.length !==1) return msg;
             
-            Dt.length === 1 && Cr.length === 1 &&
-            
-            ([Dt, Cr] = [Dt, Cr].map(v =>
-                v[0].getTurns()
-            )) &&
-            
-            abs(Cr.XXX[0] - Cr.XXX.at(-1)) < 0.3 * Cr.wide &&
-            abs(Cr.YYY[0] - Cr.YYY.at(-1)) < 0.3 * Cr.high &&
-            
+        [Dt, Cr] = [Dt, Cr].map(v => v[0].getTurns());
+        
+        msg.push((
+            abs(Cr.XXX[0] - Cr.XXX.at(-1))
+            < 0.3 * Cr.wide &&
+            abs(Cr.YYY[0] - Cr.YYY.at(-1))
+            < 0.3 * Cr.high
+        ) || 'start too far from end');
+        
+        msg.push((
             Cr.wide > prefs.minSize &&
+            Cr.high > prefs.minSize
+        ) || 'too small');
+        
+        msg.push((
             Cr.wide < prefs.maxSize * 2 &&
-            Cr.high > prefs.minSize &&
-            Cr.high < prefs.maxSize * 2 &&
+            Cr.high < prefs.maxSize * 2
+        ) || 'too big');
             
+        msg.push((
             Cr.wide / Cr.high > 0.7 &&
-            Cr.wide / Cr.high < 1.8 &&
+            Cr.wide / Cr.high < 1.8
+        ) || 'too elliptical');
             
-            Cr.turns.x > 0 && Cr.turns.x < 3 &&
-            Cr.turns.y > 0 && Cr.turns.y < 4 &&
-            
-            abs(((Cr.xMin + Cr.xMax) / 2) - Dt.XXX[0])
+        msg.push((
+            Cr.turns?.x > 0 && Cr.turns?.x < 3 &&
+            Cr.turns?.y > 0 && Cr.turns?.y < 4
+        ) || 'needs turning');
+        
+        Cr.getCenter();
+        
+        msg.push((
+            abs(Cr.center.x - Dt.XXX[0])
             < 0.2 * Cr.wide &&
-            abs(((Cr.yMin + Cr.yMax) / 2) - Dt.YYY[0])
-            < 0.2 * Cr.high &&
+            abs(Cr.center.y - Dt.YYY[0])
+            < 0.2 * Cr.high
+        ) || 'dot not in center');
             
-            true
-            
-        );
+        return msg;
         
     },
      
     // backwards-P paragraph &#182;
     par: d => {
         
-        let V, V1, V2, P, high;
+        let V, V1, V2, P, high, msg = [];
         
-        return (
+        msg.push(
+            d.length === 3
+        || 'must be three lines');
+        
+        if (d.length !== 3) return msg;
+        
             
-            d.length === 3 &&
-            
-            ([V, P] = d.reduce((acc, c) => (acc[(
+        [V, P] = d.reduce((acc, c) => (acc[(
                 
                 c.slice(1).every(p =>
                     abs(p[0] - c[0][0]) < 20
                 )
                     
-            )?0:1].push(new LineObj(c)),acc),[[],[]])) &&
-            V.length === 2 && P.length === 1 &&
+        ) ? 0 : 1].push(new LineObj(c)),acc),[[],[]]);
             
-            (
-                [V1, V2, P] = [...V, P[0]].map(v =>
-                    v.getTurns()
-                ),
-                high = max(V1.yMax, V2.yMax, P.yMax) -
-                       min(V1.yMin, V2.yMin, P.yMin)
-            ) &&
-            
-            P.wide > prefs.minSize &&
-            P.wide < prefs.maxSize &&
-            high > prefs.minSize &&
-            high < prefs.maxSize &&
-            
-            abs(V1.yMin - V2.yMin) < 0.2 * high &&
-            abs(V1.yMax - V2.yMax) < 0.2 * high &&
-            
-            !hitz(V1, V2)[0] &&
-            
-            abs(P.yMin - V1.yMin) < 0.2 * high &&
-            
-            abs(P.high - high / 2) < 0.3 * high &&
-            
-            P.XXX[0] - max(V1.xMax, V2.xMax) > 5 &&
-            
-            P.xMin < min(V1.xMin, V2.xMin) &&
+        msg.push((
+            V.length === 2 && P.length === 1
+        ) || '2 verticals and 1 arc');
         
+        if (V.length !== 2 || P.length !== 1) return msg;
+        
+        [V1, V2, P] = [...V, P[0]].map(v => v.getTurns());
+        
+        [V1, V2] = [V1, V2].sort((a, b) => a.xMax - b.xMax);
+        
+        high = max(V1.yMax, V2.yMax, P.yMax) -
+               min(V1.yMin, V2.yMin, P.yMin);
+            
+        msg.push((
+            P.wide > prefs.minSize &&
+            high > prefs.minSize
+        ) || 'too small');
+        
+        msg.push((
+            P.wide < prefs.maxSize &&
+            high < prefs.maxSize
+        ) || 'too big');
+        
+        msg.push(
+            abs(V1.xMin - V2.xMin) > prefs.penWidth * 2
+        || 'lines too close');
+        
+        msg.push(
+            abs(V1.xMin - V2.xMin) < prefs.penWidth * 8
+        || 'lines too farr');
+        
+        msg.push((
+            abs(V1.yMin - V2.yMin) < 0.2 * high &&
+            abs(V1.yMax - V2.yMax) < 0.2 * high
+        ) || 'line tops must align');
+        
+        msg.push(
+            !hitz(V1, V2)[0]
+        || 'lines must not touch');
+        
+        msg.push((
+            abs(P.yMin - V1.yMin) < 0.2 * high
+        ) || 'arc must be near top of lines');
+        
+        msg.push((
+            abs(P.high - high / 2) < 0.3 * high
+        ) || 'arc too large');
+            
+        msg.push(
+            P.XXX[0] - max(V1.xMax, V2.xMax) > 5
+        || 'arc must start right of lines');
+            
+        msg.push(
+            P.xMin < min(V1.xMin, V2.xMin)
+        || 'arc must extend left of lines');
+        
+        msg.push((
             P.XXX[0]     > P.xMin &&
-            P.XXX.at(-1) > P.xMin &&
-            
+            P.XXX.at(-1) > P.xMin
+        ) || 'arc wrong direction');
+        
+        msg.push((
             P.getTurns().turns.y < 3 && P.turns.x < 2
-            
-        );
+        ) || 'too many twists');
+        
+        return msg;
        
     },
 
     // x-marx the spot &#215;
     mrx: d => {
         
-        let Up, Dn, pt;
+        let Up, Dn, pt, msg = [];
         
-        return (
+        msg.push(
+            d.length === 2
+        || 'must be two lines');
+        
+        if (d.length !== 2) return msg;
+        
             
-            d.length === 2 &&
-            
-            ([Up, Dn] = linz(d).reduce((acc, LL) => (
+        [Up, Dn] = linz(d).reduce((acc, LL) => (
                 
-                LL.getSlopes().getTurns()
-                  .getAtOrig().org.getTurns(),
+            LL.getSlopes().getTurns()
+              .getAtOrig().org.getTurns(),
                 
-                acc[(
-                  LL.slopes.all < -0.2 && LL.slopes.all > -4.0
+            acc[(
+              LL.slopes.all < -0.2 && LL.slopes.all > -4.0
                     ? 0 :
-                  LL.slopes.all >  0.2 && LL.slopes.all <  4.0
+              LL.slopes.all >  0.2 && LL.slopes.all <  4.0
                     ? 1 : 2
-                )].push(LL),
+            )].push(LL),
                 
-                acc
+            acc
                 
-            ),[[],[],[]])) &&
+        ),[[],[],[]]);
             
-            Up.length === 1 && Dn.length === 1 &&
-            
-            (Up = Up[0], Dn = Dn[0]) &&
-            
+        msg.push((
+            Up.length === 1 && Dn.length === 1
+        ) || 'needs 1 up and 1 dn line');
+        
+        if (Up.length !== 1 || Dn.length !==1) return msg;
+        
+        Up = Up[0];
+        Dn = Dn[0];
+        
+        msg.push (
             [Up.org, Dn.org].every(LL =>
                 (LL.turns.x < 2 && LL.turns.y === 0) ||
                 LL.XXX.every(x => abs(x) < 5)
-            ) &&
+            )
+        || 'lines not straight');
             
+        msg.push((
             max(Up.wide, Dn.wide) < 2 * prefs.maxSize &&
             max(Up.high, Dn.high) < 2 * prefs.maxSize &&
             min(Up.org.len, Dn.org.len) /
-            max(Up.org.len, Dn.org.len) > 0.5 &&
-            
-            (pt = hitz(Up, Dn)) &&
-            
-            (pt.length === 1) &&
-            
+            max(Up.org.len, Dn.org.len) > 0.5
+        ) || 'bad proportions');
+        
+        pt = hitz(Up, Dn);
+        
+        msg.push(
+            pt.length === 1
+        || 'must be one cross');
+        
+        if (pt.length !== 1) return msg;
+        
+        msg.push((
             [Up.coor[0], Dn.coor[0]].every((c, i) => {
                 let dis = sqrt(
                     (c[0] - pt[0][0]) ** 2 +
@@ -1059,124 +1564,757 @@ const tests = {
                 return dis > 0.3 * [Up, Dn][i].org.len &&
                        dis < 0.7 * [Up, Dn][i].org.len
             })
+        ) || 'must cross near center');
             
-        );
+        return msg;
         
     },
     
     // + sign &#43;
     pls: d => {
         
-        let Vt, Hz, pt;
+        let Vt, Hz, pt, msg = [];
         
-        return (
+        msg.push(
+            d.length === 2
+        || 'must be two lines');
+        
+        if (d.length !== 2) return msg;
+        
+        [Vt, Hz] = linz(d).reduce((acc, LL) => {
+        
+            LL.getTurns();
+        
+            if (
+                LL.high > prefs.minSize &&
+                LL.high < prefs.maxSize * 2 &&
+                LL.wide < LL.high * 0.2
+            ) {
+                acc[0].push(LL)
+            }
+            else if (
+                LL.wide > prefs.minSize &&
+                LL.wide < prefs.maxSize * 2 &&
+                LL.high < LL.wide * 0.2
+            ) {
+                acc[1].push(LL)
+            }
+            return acc;
+        }, [[], []]);
             
-            d.length === 2 &&
-            
-            ([Vt, Hz] = linz(d).reduce((acc, LL) => {
-            
-                LL.getTurns();
-            
-                if (
-                    LL.high > 20 &&
-                    LL.high < 2 * prefs.maxSize &&
-                    LL.wide < 0.2 * LL.high &&
-                    LL.turns.y === 0 &&
-                    LL.turns.x < 2
-                ) {
-                    acc[0].push(LL)
-                }
-                else if (
-                    LL.wide > 20 &&
-                    LL.wide < 2 * prefs.maxSize &&
-                    LL.high < 0.2 * LL.wide &&
-                    LL.turns.x === 0 &&
-                    LL.turns.y < 2
-                ) {
-                    acc[1].push(LL)
-                }
-                return acc;
-            },[[],[]])) &&
-            
-            Vt.length === 1 && Hz.length === 1 &&
-            (Vt = Vt[0], Hz = Hz[0]) &&
-            
+        msg.push((
+            Vt.length === 1 && Hz.length === 1
+        ) || 'needs 1 vertical and 1 horizontal');
+        
+        if (Vt.length !== 1 || Hz.length !== 1) return msg;
+        
+        Vt = Vt[0];
+        Hz = Hz[0];
+        
+        msg.push(
             min(Vt.high, Hz.wide) / max(Vt.high, Hz.wide)
-            > 0.45 &&
-            
-            (pt = hitz(Vt, Hz)) &&
-            
-            (Vt.per = abs(Vt.YYY[0] - pt[0][1])/Vt.high) &&
-            0.3 < Vt.per && Vt.per < 0.7 &&
-            (Hz.per = abs(Hz.XXX[0] - pt[0][0])/Hz.wide) &&
-            0.3 < Hz.per && Hz.per < 0.7
-            
-        );
+            > 0.45
+        || 'bad proportion');
         
-    },
-    
-    // $ big bux
-    bux: d => {
+        msg.push(
+            (pt = hitz(Vt, Hz)).length === 1
+        || 'must be one intersection');
         
-        let Ss, Dn, pts;
+        if (pt.length !== 1) return msg;
         
-        return (
-            
-            d.length === 2 &&
-            
-            ([Ss, Dn] = d.map(c => new LineObj(c))) &&
-            
-            Ss.xMin < Dn.xMin &&
-            Ss.xMax > Dn.xMax &&
-            Dn.yMin < Ss.yMin &&
-            Dn.yMax > Ss.yMax &&
-            
-            (Ss.getTurns(), pts = hitz(Ss, Dn)) &&
-            
-            pts.length === 3 &&
-            
-            Ss.turns.x === 2 &&
-            Ss.turns.y === 2 &&
-            Ss.turns.xPts[0][0] < Ss.XXX[0] &&
-            Ss.turns.xPts[1][0] > Ss.turns.xPts[0][0]
-            
-        );
+        pt = pt[0];
+        Vt.getCenter();
+        
+        msg.push(
+            dist(Vt.getCenter().center, pt) < 20 &&
+            dist(Hz.getCenter().center, pt) < 20
+        || 'cross must be near center');
+        
+        return msg;
         
     },
     
     //}
     
+    sss : d => {
+        
+        let L = linz(d)[0].getTurns().getCenter(),
+        x1, x2;
+        
+        return [
+            // one line
+            d.length === 1 &&
+            
+            // 2, but not 5, x-turns
+            L.turns.x > 1 &&
+            L.turns.x < 5 &&
+            
+            // exactly 2 or 4 y-turns
+            (L.turns.y === 2 || L.turns.y === 4) &&
+            
+            // starts higher and right of center
+            L.center.y > L.first[1] &&
+            L.first[0] > L.center.x &&
+            
+            // ends lower and left of center
+            L.last[1] > L.first[1] &&
+            L.center.x > L.last[0] &&
+            
+            // first y-turn after y-min
+            // must be a down turn
+            L.turns.yPts[0][2] >= L.yMinPt[2] &&
+            L.turns.yPts[0][3] === 1 &&
+            
+            // last y-turn must be up
+            L.turns.yPts.at(-1)[3] === -1 &&
+            
+            // first x-turn after first y-turn ...
+            (x1 = L.turns.xPts.find(
+                v => v[2] > L.turns.yPts[0][2]
+            )) && x1 &&
+            // is a high left right-turn
+            (
+                x1[3] === 1,
+                x1[0] < L.center.x,
+                x1[1] < L.center.y
+            ) &&
+            
+            // the next x-turn after that x-turn
+            (x2 = L.turns.xPts.find(
+                v => v[2] > x1[2]
+            )) && x2 &&
+            // is a low right left-turn
+            (
+                x2[3] === -1,
+                x2[0] > L.center.x,
+                x2[1] > L.center.y
+            ) &&
+            true
+        ]
+    },
+    
+    // S s-shape
+    yyysss : d => {
+        
+        let Ss = linz(d)[0].getTurns().getCenter(),
+            msg = [];
+            
+        /*
+        log(
+            //'full',leng(Ss.coor),
+            //'clip',leng(Ss.coor.splice(0,8))
+            'xs',
+            Ss.turns.xPts.map(v =>
+            v.map(k => k.toFixed(0))).join('\n'),
+            '\n\nys',
+            Ss.turns.yPts.map(v =>
+            v.map(k => k.toFixed(0))).join('\n')
+        );
+        */
+        
+        msg.push((
+            d.length === 1 &&
+            Ss.turns.x > 1 &&
+            Ss.turns.x < 5 &&
+            (
+            Ss.turns.y === 2 ||
+            Ss.turns.y === 4
+            ) &&
+            
+            true
+        ) || 'one line & two curves');
+        
+        if (
+            d.length !== 1 ||
+            Ss.turns.x < 2 ||
+            Ss.turns.y < 2
+        ) return msg;
+        
+        
+        msg.push(
+            !Ss.hasSelfXs()
+        || 'may not cross itself');
+        
+        let T = [
+            ...Ss.turns.xPts.map(v => (v.push('x'),v)),
+            ...Ss.turns.yPts.map(v => (v.push('y'),v))
+        ].sort((a, b) => a[2] - b[2]);
+        
+        /*
+        msg.push((
+            Ss.yMin < Ss.YYY[0] &&
+            Ss.yMinPt[0] < Ss.XXX[0] &&
+            T[0][4] === 'y' &&
+            T[0][1] < Ss.YYY[0] &&
+            T[1][4] === 'x' &&
+            T[1][1] > T[0][1] &&
+            T[1][0] < T[0][0] &&
+            T[1][0] < Ss.center.x &&
+            T[2][4] === 'x' &&
+            T[2][0] > Ss.center.x &&
+            T[3][4] === 'y' &&
+            T[3][0] < T[2][0] &&
+            Ss.YYY.at(-1) > Ss.YYY[0] &&
+            true
+        ) || 'not an S');
+        */
+        
+        byID('advice').innerHTML =
+        msg.filter(v => v !== true).join('<br>');
+        
+        log(msg);
+        
+        return msg;
+        
+    },
+    
+    //{
+        
+    bigbux : d => {
+        
+        let Ss, Dn;
+        
+        return [
+            d.length === 2 &&
+            ([Ss, Dn] = linz(d)) &&
+            Dn.wide < Dn.high * 0.2 &&
+            Dn.high < Ss.high * 2 &&
+            tests.sss([[...Ss.coor]]).filter(
+                v => v !== true
+            ).length === 0 &&
+            hitz(Ss, Dn).length === 3 &&
+            Ss.xMin < Dn.xMin &&
+            Ss.xMax > Dn.xMax &&
+            Dn.yMin < Ss.yMin &&
+            Dn.yMax > Ss.yMax &&
+            true
+        ];
+    },
+    
+    // $ big bux
+    bux: d => {
+        
+        let Ss, Dn, msg = [];
+        
+        msg.push(
+            d.length === 2
+        || 'must be two lines');
+        
+        if (d.length !== 2) return msg;
+        
+        [Ss, Dn] = linz(d);
+        
+        msg.push(
+            tests.sss([[...Ss.coor]])
+            .filter(v => v!== true).length === 0
+        || 'first line must be S');
+        
+        msg.push((
+            Ss.xMin < Dn.xMin &&
+            Ss.xMax > Dn.xMax &&
+            Dn.yMin < Ss.yMin &&
+            Dn.yMax > Ss.yMax
+        ) || 'line must cross & pass S');
+            
+        msg.push(
+            hitz(Ss, Dn).length === 3
+        || 'must cross three times');
+        
+        return msg;
+        
+    },
+    
     // " dbl quotes
     dbl: d => {
         
-        let L1, L2, R1, R2, high;
+        let L1, L2, R1, R2, high, msg = [];
         
-        return (
+        msg.push(
+            d.length === 4
+        || 'there must be four lines');
+        
+        if (d.length !== 4) return msg;
+        
             
-            d.length === 4 &&
+        //(d[0][0][0] < d[3][0][0] || d.reverse());
+        
+        [L1, L2, R1, R2] = (linz(d).map(c => c.getAtOrig())
+        ).sort((a, b) => a.XXX[0] - b.XXX[0]);
+        
+        msg.push((
+            hitz(L1, L2).length === 0 &&
+            hitz(R1, R2).length === 0
+        ) || 'lines cannot touch');
             
-            (d[0][0][0] < d[3][0][0] || d.reverse()) &&
-            
-            ([L1, L2, R1, R2] = linz(d).map(c => c.getAtOrig())) &&
-            
+        msg.push((
             0.9 < L1.org.ang && L1.org.ang < 1.5 &&
-            0.9 < L2.org.ang && L2.org.ang < 1.5 &&
+            0.9 < L2.org.ang && L2.org.ang < 1.5
+        ) || 'left quotes wrong angle');
+        
+        msg.push((
             1.0 < R1.org.ang && R1.org.ang < 2.2 &&
-            1.0 < R2.org.ang && R2.org.ang < 2.2 &&
-            
-            abs(L2.XXX[0] - L1.XXX[0]) < abs(R1.XXX[0] - L2.XXX[0]) &&
-            
-            abs(L1.yMin - R2.yMin) < L1.high * 0.5 &&
-            
+            1.0 < R2.org.ang && R2.org.ang < 2.2
+        ) || 'right quotes wrong angle');
+        
+        msg.push(
+            abs(L2.XXX[0] - L1.XXX[0]) <
+            abs(R1.XXX[0] - L2.XXX[0])
+        || 'quotes too close');
+        
+        msg.push(
+            abs(L1.yMin - R2.yMin) < L1.high * 0.5
+        || 'must align at top');
+        
+        msg.push(
+            abs(L1.XXX[0] - L2.XXX[0]) > prefs.penWidth * 2
+        || 'lines too close');
+        
+        msg.push(
             abs(L1.XXX[0] - L2.XXX[0]) < prefs.penWidth * 8
-            
-        );
+        || 'lines too far apart');
+        
+        return msg;
        
+    },
+    
+    // :) smiley face
+    sml : d => {
+        
+        let Mt, I1, I2, msg = [];
+        
+        msg.push(
+            d.length === 3
+        || 'only three lines');
+        
+        if (d.length !== 3) return msg;
+        
+        d = linz(d);
+        
+        [[Mt], [I1, I2]] = d.reduce((acc, LL) => (
+            LL.getCenter(),
+            acc[
+                LL.coor.length > 3 ? 0 : 1
+            ].push(LL),
+            acc
+        ),[[],[]]);
+        
+        msg.push((
+            Mt !== undefined &&
+            I1 !== undefined &&
+            I2 !== undefined
+        ) || 'needs 2 dots, 1 line');
+        
+        if (
+            Mt === undefined ||
+            I1 === undefined ||
+            I2 === undefined
+        ) { return msg; }
+        
+        [I1, I2] = [I1, I2].sort((a, b) => b.xMin - a.xMin);
+        
+        if (Mt.XXX[0] > Mt.XXX.at(-1)) {
+            Mt = new LineObj(Mt.coor.reverse());
+        }
+        
+        msg.push((
+            I1.center.y < Mt.YYY[0] &&
+            I2.center.y < Mt.YYY.at(-1)
+        ) || 'eyes not on top');
+        
+        msg.push((
+            I1.center.x > Mt.XXX[0] &&
+            I1.center.x < Mt.XXX.at(-1)
+        ) || 'left eye not over mouth');
+        
+        msg.push((
+            I2.center.x > Mt.XXX[0] &&
+            I2.center.x < Mt.XXX.at(-1)
+        ) || 'right eye not over mouth');
+        
+        msg.push((
+            abs(I1.center.y - I2.center.y) < 10
+        ) || 'eyes not lined up');
+        
+        return msg;
+        
+    },
+    
+    // check plus &#10003;&#43;
+    cpl : d => {
+        let Cx, P1, P2, msg = [];
+        
+        msg.push(
+            d.length === 3
+        || 'must be three lines');
+        
+        if (d.length !== 3) return msg;
+        
+        [Cx, P1, P2] = linz(d).sort((a, b) =>
+            a.xMin - b.xMin
+        );
+        
+        msg.push(
+            tests.chx([
+                Cx.XXX.map((v, i) => [v, Cx.YYY[i]])
+            ]).every(k => k === true)
+        || 'not a check');
+        
+        msg.push(
+            tests.pls([
+                P1.XXX.map((v, i) => [v, P1.YYY[i]]),
+                P2.XXX.map((v, i) => [v, P2.YYY[i]])
+            ]).every(k => k === true)
+        || 'not a plus');
+        
+        return msg;
+        
+    },
+        
+    // P two-stroke
+    ppp : d => {
+        
+        let L, P, msg = [];
+        
+        msg.push(
+            d.length === 2
+        || 'must be two lines');
+        
+        if (d.length !== 2) return msg;
+        
+        [L, P] = linz(d).reduce((acc, LL) => {
+            
+            LL.getTurns().getCenter();
+        
+            acc[
+            (
+                LL.high > prefs.minSize * 2 &&
+                LL.high < prefs.maxSize * 2 &&
+                LL.wide < LL.high * 0.2 &&
+                LL.turns.y === 0 &&
+                LL.turns.x < 2
+            ) ? 0 : 1].push(LL);
+            
+            return acc;
+            
+        }, [[], []]);
+        
+        msg.push((
+            L.length === 1 &&
+            P.length === 1
+        ) || 'needs dn-stroke an arc');
+        
+        if (L.length !== 1 || P.length !== 1) return msg;
+        
+        L = L[0];
+        P = P[0];
+        
+        L.getAtOrig();
+        
+        msg.push((
+            L.org.ang > 1.3 &&
+            L.org.ang < 1.84
+        ) || 'must go downward');
+        
+        msg.push((
+            P.hasSelfXs() === false
+        ) || 'arc cannot cross itself');
+        
+        msg.push((
+            dist(L.coor[0], P.coor[0]) < 17
+        ) || 'start points close')
+        
+        msg.push((
+            P.YYY.at(-1) < L.center.y
+        ) || 'arc too low');
+        
+        msg.push((
+            P.center.x > L.xMax
+        ) || 'make arc on right');
+        
+        msg.push((
+            dist(P.coor[0], P.coor.at(-1)) > L.high * 0.1
+        ) || 'arc closing too high');
+        
+        return msg;
+    },
+    
+    // P one-stroke
+    pp1 : d => {
+        
+        let L, msg = [];
+        
+        msg.push(
+            d.length === 1
+        || 'must be one line');
+        
+        if (d.length !== 1) return msg;
+        
+        L = linz(d)[0].getTurns().getCenter();
+        
+        msg.push((
+            L.wide > prefs.minSize &&
+            L.high > prefs.minSize &&
+            L.high < prefs.maxSize * 2 &&
+            L.wide < 0.9 * L.high
+        ) || 'too big or small' );
+        
+        msg.push((
+            L.turns.x > 0 &&
+            L.turns.y > 1
+        ) || 'not enough turns');
+        
+        if (L.turns.x < 1 || L.turns.y < 2) return msg;
+        
+        msg.push(
+            L.turns.yPts[0][2] === L.yMaxPt[2]
+        || 'dn-stroke must be first');
+        
+        msg.push(
+            (L.turns.yPts[0][1] - L.YYY[0]) > L.high * 0.5
+        || 'dn-stroke too short');
+        
+        msg.push(
+            L.turns.yPts[1][1] < L.coor[0][1]
+        || 'must loop higher than dn-stroke');
+        
+        msg.push(
+            L.turns.yPts[1][2] < L.xMaxPt[2]
+        || 'must loop clockwise');
+        
+        msg.push((
+            abs(L.YYY.at(-1) - L.center.y) < 20 &&
+            L.YYY.at(-1) > L.YYY[0]
+        ) || 'loop end in wrong place');
+        
+        msg.push((
+            L.turns.yPts[1][0] > L.coor[0][0] &&
+            L.turns.yPts[1][0] > L.turns.yPts[0][0]
+        ) || 'loop on wrong side');
+        
+        msg.push(
+            L.turns.xPts.filter(pp => pp[2] > L.yMinPt[2])
+            .length === 1
+        || 'loop too spiral');
+        
+        return msg;
+        
+    },
+    
+    // s.p. spelling, 1-stroke P
+    spx : d => {
+        
+        let Ss, D1, P1, P2, D2, msg = [];
+        
+        msg.push((
+            d.length === 5
+        ) || 'must be 5 lines');
+        
+        if (d.length !== 5) return msg;
+        
+        [Ss, D1, P1, P2, D2] = linz(d).sort((a, b) =>
+            a.xMin - b.xMin
+        );
+        
+        msg.push((
+            D1.getLength().lineLength < prefs.penWidth &&
+            D2.getLength().lineLength < prefs.penWidth
+        ) || 'needs two dots');
+         
+        msg.push((
+            tests.sss([
+                Ss.XXX.map((v, i) => [v, Ss.YYY[i]])
+            ]).every(k => k === true)
+        ) || '1st letter must be S');
+        
+        msg.push((
+            tests.ppp([
+                P1.XXX.map((v, i) => [v, P1.YYY[i]]),
+                P2.XXX.map((v, i) => [v, P2.YYY[i]])
+            ]).every(k => k === true)
+        ) || '2nd letter must be P');
+        
+        return msg;
+        
+    },
+    
+    // s.p. spelling, 2-stroke P
+    spd : d => {
+        
+        let Ss, D1, P1, D2, msg = [];
+        
+        msg.push((
+            d.length === 4
+        ) || 'must be 4 lines');
+        
+        if (d.length !== 4) return msg;
+        
+        [Ss, D1, P1, D2] = linz(d).sort((a, b) =>
+            a.xMin - b.xMin
+        );
+        
+        msg.push((
+            D1.getLength().lineLength < prefs.penWidth &&
+            D2.getLength().lineLength < prefs.penWidth
+        ) || 'needs two dots');
+         
+        msg.push((
+            tests.sss([Ss.coor]).every(k => k === true)
+        ) || '1st letter must be S');
+        
+        msg.push((
+            tests.pp1([P1.coor]).every(k => k === true)
+        ) || '2nd letter must be P');
+        
+        return msg;
+        
+    },
+   
+    // (sp) circled, 2-stroke P
+    spo : d => {
+        
+        let Ss, P1, P2, Cr, msg = [];
+        
+        msg.push(
+            d.length === 4
+        || 'must be four lines');
+        
+        if (d.length !== 4) return msg;
+        
+        [Cr, Ss, P1, P2] = linz(d).sort((a,b)=>a.xMin-b.xMin);
+        
+        msg.push(
+            tests.sss([Ss.coor]).every(v => v === true)
+        || 'needs valid s');
+        
+        msg.push(
+            tests.ppp([P1.coor,P2.coor]).every(v => v === true)
+        || 'needs valid p');
+        
+        msg.push(
+            dist(Cr.coor[0], Cr.coor.at(-1)) < 100
+        || 'close circle');
+        
+        const [largeP, smallP] =
+            P1.yMax > P2.yMax ? [P1, P2] : [P2, P1];
+            
+        msg.push(
+            !hitz(Cr, Ss)?.[0] &&
+            !hitz(Cr, smallP)?.[0] &&
+            Cr.yMin < Ss.yMin &&
+            Cr.yMin < P1.yMin &&
+            Cr.yMax > Ss.yMax &&
+            Cr.yMax > smallP.yMax
+        || 'enclose letters');
+        
+        return msg;
+    },
+    
+    // (sp) circled, 1-stroke P
+    sp1 : d => {
+        
+        let Cr, Ss, P1, msg = [];
+        
+        msg.push(
+            d.length === 3
+        || 'must be three lines');
+        
+        if (d.length !== 3) return msg;
+        
+        [Cr, Ss, P1] = linz(d).sort((a,b)=>a.xMin-b.xMin);
+        
+        msg.push(
+            tests.sss([Ss.coor]).every(v => v === true)
+        || 'needs valid s');
+        
+        msg.push(
+            tests.pp1([P1.coor]).every(v => v === true)
+        || 'needs valid p');
+        
+        msg.push(
+            dist(Cr.coor[0], Cr.coor.at(-1)) < 100
+        || 'close circle');
+        
+        msg.push(
+            //!hitz(Cr, Ss)?.[0] &&
+            Cr.xMin < Ss.xMin &&
+            Cr.xMax > P1.xMax &&
+            Cr.yMin < Ss.yMin &&
+            Cr.yMin < P1.yMin &&
+            Cr.yMax > Ss.yMax
+        || 'enclose letters');
+        
+        return msg;
+    },
+    
+    gir : d => {
+        
+        let L, msg = [];
+        
+        msg.push(
+            d.length === 1
+        || 'must be one line');
+        
+        if (d.length !== 1) return msg;
+        
+        L = linz(d)[0].getTurns().getCenter();
+        
+        msg.push((
+            L.turns.x > 4 &&
+            L.turns.y > 4
+        ) || 'not enough turns');
+        
+        msg.push(
+            !L.hasSelfXs()
+        || 'cannot cross');
+        
+        /*
+        msg.push(
+            [
+                L.turns.xPts.filter(v => v[3] !== 1),
+                L.turns.xPts.filter(v => v[3] !== -1),
+                L.turns.yPts.filter(v => v[3] !== 1),
+                L.turns.yPts.filter(v => v[3] !== -1),
+            ].every(pts =>
+                !!pts.reduce((acc, c) => {
+                    const dis = dist(c, L.last);
+                    return dis < acc ? dis : false;
+                }, Infinity)
+            )
+        || 'turns must get closer');
+        */
+        
+        msg.push(/^(xy)*x?$|^(yx)*y?$/.test(
+            [
+                ...L.turns.xPts.map(v => [...v, 'x']),
+                ...L.turns.yPts.map(v => [...v, 'y'])
+            ].sort(
+                (a,b) => a[2] - b[2]
+            ).map(v => v[4]).join('')
+        ) || 'turns must alternate');
+        
+        //log(msg.filter(v => v !== true).join('\n'));
+        
+        return msg;
+        
     }
+
+    
+    //}
     
 };
 
 //}
+
+const makeDot = (pt, rad=4, col='white', fil) => {
+    const dot = document.createElementNS(NS, 'circle');
+    dot.setAttribute('r', rad);
+    dot.setAttribute('cx', pt[0]);
+    dot.setAttribute('cy', pt[1]);
+    dot.setAttribute('fill', fil || 'none');
+    dot.setAttribute('stroke', col);
+    dot.setAttribute('stroke-width', 1);
+    return dot;
+}
 
 // drawing methods {
 
@@ -1208,36 +2346,6 @@ const down = e => {
 
 };
 
-const uppp = e => {
-    
-    if (e.pointerId !== pid) return;
-    
-    kill(e);
-    
-    e.target.releasePointerCapture(pid);
-    
-    pid = '';
-    
-    if (
-        testList[testNum].testName === 'per' &&
-        coordList.length === 2
-    ) {
-        let dmz = linz(
-            [coordList[1].map(p=>[p.x, p.y])]
-        )[0];
-        
-        if (dmz.XXX.length < 4) {
-            dot.setAttribute('cx', dmz.xMin + dmz.wide / 2);
-            dot.setAttribute('cy', dmz.yMin + dmz.high / 2);
-            dot.classList.add('show');
-        }
-        
-    }
-    
-    waiting = setTimeout(exam, prefs.pause);
-
-};
-
 const draw = e => {
 
     kill(e);
@@ -1246,7 +2354,7 @@ const draw = e => {
     
     let curr = coordList.at(-1);
     
-    //if (curr.length > 100) return;
+    if (curr.length > 1500) return;
     
     if (
         e.pageX === curr.at(-1).x &&
@@ -1298,21 +2406,89 @@ const draw = e => {
 
 };
 
+const uppp = e => {
+    
+    if (e.pointerId !== pid) return;
+    
+    kill(e);
+    
+    e.target.releasePointerCapture(pid);
+    
+    pid = '';
+    
+    let dmz = linz(
+        [coordList.at(-1).map(p => [p.x, p.y])]
+    )[0].getCenter().getLength();
+    
+    if (dmz.lineLength < 10) {
+    
+        if (dots.children.length !== coordList.length) {
+    
+            const dot = document.createElementNS(NS, 'circle');
+    
+            dots.append(dot);
+    
+            dot.setAttribute('cx', dmz.center.x);
+            dot.setAttribute('cy', dmz.center.y);
+            dot.setAttribute('r', prefs.penWidth * 1.5);
+    
+            dot.classList.add('show');
+    
+        };
+    
+        coordList[coordList.length - 1] = [
+            new Point(dmz.center.x, dmz.center.y),
+            new Point(dmz.center.x, dmz.center.y),
+            new Point(dmz.center.x, dmz.center.y)
+        ];
+    
+    }
+    
+    waiting = setTimeout(exam, prefs.pause);
+
+};
+
 //}
 
-// examination {
+// testing obj and lists {
 
 function TO (testName, caption, icon) {
-    this.test = tests[testName];
+    this.test = d => {
+        
+        const msg = tests[testName](d).filter(
+            v => v !== true
+        );
+        
+        //advice.innerHTML = '';
+        //msg.forEach(m => advice.innerHTML += m + '<br>');
+        
+        return msg.length === 0;
+        
+    };
     this.testName = testName;
     this.caption = caption;
     this.cap = caption;
     this.icon = icon;
+    this.span = document.createElement('div');
+    this.span.innerHTML = this.caption;
+    this.maxScore = 1;
+    this.score = this.maxScore;
+    this.weight = this.score * 100;
+    this.setScore = updn => {
+        this.score +=  updn;
+        if (this.score < 0) {
+            this.score = 0;
+        } else if (this.score > this.maxScore) {
+            this.score = this.maxScore;
+        }
+        this.weight = this.score * 100;
+    };
+
 }
 
 const testList = [
     //new TO('ups', 'up stroke', '|'),
-    new TO('dns', 'down stroke', '|'),
+    //new TO('dns', 'down stroke', '|'),
     new TO('und', 'underline', '_'),
     new TO('sla', 'slash', '/'),
     new TO('lup', 'delete loop', `
@@ -1336,30 +2512,40 @@ const testList = [
     new TO('you', 'u-shape curve', '&#8746;'),
     new TO('rev', 'reverse werds', '&#8767;'),
     new TO('per', 'missing period', '&#9737;'),
-    new TO('par', 'backwards-P ', ' &#182;'),
+    new TO('par', 'paragraph', ' &#182;'),
     new TO('mrx', 'x-marx the spot', '&#215;'),
     new TO('pls', 'plus sign', '&#43;'),
-    new TO('bux', 'big bux', '$'),
-    new TO('dbl', '"dbl quotes', '"')
+    new TO('bigbux', 'big bux', '$'),
+    new TO('dbl', 'dbl quotes', '"&nbsp;&nbsp;"'),
+    new TO('sml', 'smiley face', ':)'),
+    new TO('cpl', 'check plus', '&#10003;&#43;'),
+    new TO('sss', 'S-shape', 'S'),
+    new TO('ppp', '2-line-P', 'P'),
+    new TO('pp1', '1-line-P', 'p'),
+    new TO('spx', 'spelling error', 's.p.'),
+    new TO('spd', 'spelling error', 's.p.'),
+    new TO('sp1', 'spelling error', `
+        <div style="
+            display: inline-block;
+            padding-right: 10px;
+            padding-left: 10px;
+            font-size: 30px;
+            font-family: courier;
+            border-radius: 50%;
+            border: 2px solid;
+        ">sp</div>
+    `),
+    new TO('gir', 'spiral', '&#43612;'),
 ];
 
 const xxx_testList = [
-    new TO('per', 'missing period', '&#9737;')
+    //new TO('dbl', '"dbl quotes', '"')
+    new TO('tri', 'triple line', '&#8801;')
 ];
 
-let testNum = 0;
-let testCnt = 0;
+//}
 
-const setupTest = () => {
-    testNum = (testNum + 1 + ~~(rand() * testList.length - 1)) % testList.length;
-    testCnt = 0;
-    const currTest = testList[testNum];
-    notes.innerHTML = currTest.caption  +
-    ' ' + currTest.icon +'<br>';
-
-}
-
-setupTest();
+// examination {
 
 const exam = () => {
 
@@ -1371,14 +2557,82 @@ const exam = () => {
     
     const d = coordList.map(c => c.map(p => [p.x, p.y]));
     
-    let passed = testList[testNum].test(d.map(v=>[...v]));
-     
-    notes.classList.add(passed ? 'succ' : 'fail');
-        
-    testCnt++;
+    let passed = testList.filter(t =>
+        t.test(d.map(v => [...v]))
+    );
     
-    if (passed || testCnt > 4 ) setupTest();
-    if (testCnt > 1) notes.innerHTML += '.';
+    [...byID('rat').children].forEach(v=>v.remove());
+    byID('line').setAttribute('d', '');
+    
+    if (prefs.anal) linz(d).forEach(L => {
+    
+        L.getTurns().getCenter();
+        
+        let extrema = [L.xMinPt, L.xMaxPt, L.yMinPt, L.yMaxPt];
+    
+        'xy'.split('').forEach(v => {
+            L.turns?.[v + 'Pts'].forEach((pp, i) => {
+                byID('rat').append(makeDot(
+                    pp,
+                    v === 'x' ? 5 : 3,
+                    v === 'x' ? 'green' : 'orange'
+                ));
+                extrema.forEach(v => {
+                    if (dist(pp, v) === 0) {
+                        byID('rat').append(makeDot(
+                            pp, 8, 'grey'
+                        ));
+                    }
+                });
+            });
+        });
+    
+        [L.coor[0], L.coor.at(-1), ...extrema]
+        .forEach((pp, ij) => {
+            byID('rat').append(makeDot(
+                pp,
+                ij < 2 ? 2 : 1,
+                ij < 2 ? 'red' : 'white'
+            ));
+        });
+    
+        L.getSelfXs().crosses.forEach((pp, ij) => {
+            byID('rat').append(makeDot(
+                [pp.x, pp.y], 1, 'blue'
+            ));
+        });
+    
+        byID('line').setAttribute(
+            'd',
+            byID('line').getAttribute('d') +
+            L.makeSVG().svg
+        );
+        const bit = -3;
+        byID('line').setAttribute(
+            'd',
+            byID('line').getAttribute('d') +
+            `M${L.center.x - bit} ${L.center.y - bit}
+             L${L.center.x + bit} ${L.center.y + bit}
+             M${L.center.x + bit} ${L.center.y - bit}
+             L${L.center.x - bit} ${L.center.y + bit}
+            `
+        )
+    });
+    
+    
+    notes.classList.add(
+        passed.length > 0 ? 'succ' : 'fail'
+    );
+    notes.innerHTML = '';
+    
+    if (passed.length === 0) {
+        notes.innerHTML = '';//'(nothing)';
+    } else {
+        passed.forEach(
+            t => notes.innerHTML += t.caption + ' ' +
+            t.icon +'<br>'
+        );
+    }
     
     setTimeout(() => {
         notes.classList.remove('succ', 'fail');
@@ -1387,9 +2641,15 @@ const exam = () => {
     coordList = [];
 
     path.style.opacity = 0;
-    dot.classList.remove('show');
     
-    setTimeout(() => path.remove(), 500);
+    dots.childNodes.forEach(d => {
+        d.style.opacity = 0;
+    });
+    
+    setTimeout(() => {
+        path.remove();
+        [...dots.children].forEach(d => d.remove());
+    }, 500);
 
 };
 
